@@ -14,3 +14,8 @@
 - manages block positions
 - next is implementing the btree_node.py file
 
+# May 5 @ 11:45pm
+- Implemented the btree_node.py file
+- defines the node class
+- serializes and parses to and from 512 bytes
+- next up is to work on main.py, which will have the CLI
