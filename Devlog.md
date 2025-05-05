@@ -19,3 +19,10 @@
 - defines the node class
 - serializes and parses to and from 512 bytes
 - next up is to work on main.py, which will have the CLI
+
+# May 5 @ 1pm
+- Did a big chunk of the main.py methods
+- It should be able to create, insert, search, and traverse data as well
+- Inserting into a non-empty tree was a little tricky, but I figured it out
+- also implemented the print function which shows the nodes in correct order
+- Also figured out loading it to csv but want to ensure bugs are fixed.
