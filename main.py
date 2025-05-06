@@ -7,12 +7,12 @@ from btree_node import Node
 
 def create_command(filename):
     if os.path.exists(filename):
-        print(f"Error: File '{filename}' already exists.")
+        print("Error: File '{}' already exists.".format(filename))
         sys.exit(1)
     fm = FileManager(filename)
     header = Header(root_id=0, next_block_id=1)
     fm.write_header(header)
-    print(f"Created index file '{filename}' successfully.")
+    print("Created index file '{}' successfully.".format(filename))
 
 
 def find_leaf_block(fm, current_block_id, key):
@@ -76,7 +76,7 @@ def split_node(fm, node, header):
         header.next_block_id += 1
         fm.write_node(new_root.block_id, new_root)
         fm.write_header(header)
-        print(f"Root split: new root created in block {new_root.block_id}")
+        print("Root split: new root created in block {}".format(new_root.block_id))
     else:
         parent = fm.read_node(node.parent_id)
         if parent.num_keys < 19:
@@ -126,7 +126,8 @@ def insert_command(filename, key, value):
         header.root_id = new_node.block_id
         header.next_block_id += 1
         fm.write_header(header)
-        print(f"Inserted key={key} value={value} as root node in block {new_node.block_id}")
+        print("Inserted key={} value={} as root node in block {}".format(key, value, new_node.block_id))
+
     else:
         leaf_block_id = find_leaf_block(fm, header.root_id, key)
         leaf_node = fm.read_node(leaf_block_id)
@@ -134,9 +135,9 @@ def insert_command(filename, key, value):
         if leaf_node.num_keys < 19:
             insert_into_node(leaf_node, key, value)
             fm.write_node(leaf_node.block_id, leaf_node)
-            print(f"Inserted key={key} value={value} into leaf node block {leaf_node.block_id}")
+            print("Inserted key={} value={} into leaf node block {}".format(key, value, leaf_node.block_id))
         else:
-            print(f"Leaf node {leaf_node.block_id} full → splitting...")
+            print("Leaf node {} full -> splitting...".format(leaf_node.block_id))
             split_node(fm, leaf_node, header)
             # After split, re-run insert to retry traversal (since root/parent may have changed)
             insert_command(filename, key, value)
@@ -156,7 +157,7 @@ def search_command(filename, key):
         node = fm.read_node(current_block_id)
         for i in range(node.num_keys):
             if node.keys[i] == key:
-                print(f"Found key={key} value={node.values[i]} in block {node.block_id}")
+                print("Found key={} value={} in block {}".format(key, node.values[i], node.block_id))
                 return
         if node.children[0] == 0:
             break
@@ -167,7 +168,7 @@ def search_command(filename, key):
         if next_block_id == 0:
             break
         current_block_id = next_block_id
-    print(f"Search failed: key={key} not found.")
+    print("Search failed: key={} not found.".format(key))
 
 
 def print_subtree(fm, block_id):
@@ -175,7 +176,7 @@ def print_subtree(fm, block_id):
     for i in range(node.num_keys):
         if node.children[i] != 0:
             print_subtree(fm, node.children[i])
-        print(f"{node.keys[i]}={node.values[i]}")
+        print("{}={}".format(node.keys[i], node.values[i]))
     if node.children[node.num_keys] != 0:
         print_subtree(fm, node.children[node.num_keys])
 
@@ -194,14 +195,14 @@ def extract_subtree(fm, block_id, file_handle):
     for i in range(node.num_keys):
         if node.children[i] != 0:
             extract_subtree(fm, node.children[i], file_handle)
-        file_handle.write(f"{node.keys[i]}, {node.values[i]}\n")
+        file_handle.write("{}, {}\n".format(node.keys[i], node.values[i]))
     if node.children[node.num_keys] != 0:
         extract_subtree(fm, node.children[node.num_keys], file_handle)
 
 
 def extract_command(filename, output_csv):
     if os.path.exists(output_csv):
-        print(f"Error: Output file '{output_csv}' already exists.")
+        print("Error: Output file '{}' already exists.".format(output_csv))
         sys.exit(1)
     fm = FileManager(filename)
     header = fm.read_header()
@@ -210,12 +211,12 @@ def extract_command(filename, output_csv):
         return
     with open(output_csv, 'w') as f:
         extract_subtree(fm, header.root_id, f)
-    print(f"Extracted all key/value pairs to '{output_csv}' successfully.")
+    print("Extracted all key/value pairs to '{}' successfully.".format(output_csv))
 
 
 def load_command(filename, input_csv):
     if not os.path.exists(input_csv):
-        print(f"Error: Input file '{input_csv}' does not exist.")
+        print("Error: Input file '{}' does not exist.".format(input_csv))
         sys.exit(1)
     with open(input_csv, 'r') as f:
         line_num = 0
@@ -230,10 +231,10 @@ def load_command(filename, input_csv):
                 value = int(value_str.strip())
                 insert_command(filename, key, value)
             except Exception as e:
-                print(f"Error parsing line {line_num}: {line}")
-                print(f"Reason: {e}")
+                print("Error parsing line {}: {}".format(line_num, line))
+                print("Reason: {}".format(e))
                 continue
-    print(f"Loaded all key/value pairs from '{input_csv}' into '{filename}' successfully.")
+    print("Loaded all key/value pairs from '{}' into '{}' successfully.".format(input_csv, filename))
 
 
 def main():
@@ -275,7 +276,7 @@ def main():
             sys.exit(1)
         load_command(filename, sys.argv[3])
     else:
-        print(f"Unknown command: {command}")
+        print("Unknown command: {}".format(command))
 
 
 if __name__ == "__main__":

@@ -17,10 +17,11 @@ class Header:
             raise ValueError("Header block must be exactly 512 bytes")
         magic = data[0:8]
         if magic != b'4348PRJ3':
-            raise ValueError(f"Invalid magic number: {magic}")
+            raise ValueError("Invalid magic number: {}".format(magic))
         root_id = int.from_bytes(data[8:16], 'big', signed=False)
         next_block_id = int.from_bytes(data[16:24], 'big', signed=False)
         return cls(root_id, next_block_id)
 
     def __repr__(self):
-        return f"<Header magic={self.magic.decode()} root_id={self.root_id} next_block_id={self.next_block_id}>"
+        return "<Header magic={} root_id={} next_block_id={}>".format(
+            self.magic.decode(), self.root_id, self.next_block_id)

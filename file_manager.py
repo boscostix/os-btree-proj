@@ -2,6 +2,7 @@ import os
 from header import Header
 from btree_node import Node
 
+
 class FileManager:
     BLOCK_SIZE = 512
 
@@ -17,7 +18,7 @@ class FileManager:
             f.seek(block_index * self.BLOCK_SIZE)
             data = f.read(self.BLOCK_SIZE)
             if len(data) < self.BLOCK_SIZE:
-                raise IOError(f"Block {block_index} is incomplete or missing")
+                raise IOError("Block {} is incomplete or missing".format(block_index))
             return data
 
     def write_block(self, block_index, data):

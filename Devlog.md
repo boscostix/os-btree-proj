@@ -31,3 +31,8 @@
 - Finished implementing all functions required in main
 - Finished writing up the Readme file
 - Need to double-check and test everything, but seems to be working fine right now
+
+# May 5 @ 11 am
+- Made sure it is working on UTD server
+- removed f strings
+- Should be ready to submit

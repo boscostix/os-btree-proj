@@ -32,11 +32,11 @@ class Node:
         num_keys = int.from_bytes(data[16:24], 'big', signed=False)
         keys = [int.from_bytes(data[24 + i*8:32 + i*8], 'big', signed=False) for i in range(19)]
         values = [int.from_bytes(data[24 + 152 + i*8:32 + 152 + i*8], 'big', signed=False) for i in range(19)]
-        children = [int.from_bytes(data[24 + 152 + 152 + i*8:32 + 152 + 152 + i*8], 'big', signed=False) for i in range(20)]
+        children = [int.from_bytes(data[24 + 152 + 152 + i*8:32 + 152 + 152 + i*8], 'big',
+                                   signed=False) for i in range(20)]
         return cls(block_id, parent_id, num_keys, keys, values, children)
 
     def __repr__(self):
-        return (f"<Node block_id={self.block_id} parent_id={self.parent_id} num_keys={self.num_keys} "
-                f"keys={self.keys[:self.num_keys]} values={self.values[:self.num_keys]} "
-                f"children={self.children[:self.num_keys+1]}>")
-
+        return ("<Node block_id={} parent_id={} num_keys={} keys={} values={} children={}>"
+                .format(self.block_id, self.parent_id, self.num_keys,
+                        self.keys[:self.num_keys], self.values[:self.num_keys], self.children[:self.num_keys + 1]))
