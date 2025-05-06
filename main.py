@@ -7,9 +7,8 @@ from btree_node import Node
 
 def create_command(filename):
     if os.path.exists(filename):
-        print(f"Error: File '{filename}' already exists. Aborting create.")
+        print(f"Error: File '{filename}' already exists.")
         sys.exit(1)
-
     fm = FileManager(filename)
     header = Header(root_id=0, next_block_id=1)
     fm.write_header(header)
@@ -17,11 +16,8 @@ def create_command(filename):
 
 
 def find_leaf_block(fm, current_block_id, key):
-    """
-    Traverse from root to leaf to find the block ID of the leaf node where key should go.
-    """
     node = fm.read_node(current_block_id)
-    while node.children[0] != 0:  # internal node → has children
+    while node.children[0] != 0:
         i = 0
         while i < node.num_keys and key >= node.keys[i]:
             i += 1
@@ -33,9 +29,6 @@ def find_leaf_block(fm, current_block_id, key):
 
 
 def insert_into_node(node, key, value):
-    """
-    Insert key/value into node's keys/values in sorted order (assuming node not full).
-    """
     i = node.num_keys - 1
     while i >= 0 and node.keys[i] > key:
         if i + 1 < 19:
@@ -47,6 +40,71 @@ def insert_into_node(node, key, value):
     node.num_keys += 1
 
 
+def split_node(fm, node, header):
+    mid_index = node.num_keys // 2
+    promoted_key = node.keys[mid_index]
+    promoted_value = node.values[mid_index]
+
+    right_node = Node(
+        block_id=header.next_block_id,
+        parent_id=node.parent_id,
+        num_keys=node.num_keys - mid_index - 1,
+        keys=node.keys[mid_index + 1:] + [0] * (19 - (node.num_keys - mid_index - 1)),
+        values=node.values[mid_index + 1:] + [0] * (19 - (node.num_keys - mid_index - 1)),
+        children=node.children[mid_index + 1:] + [0] * (20 - (node.num_keys - mid_index))
+    )
+    header.next_block_id += 1
+
+    node.num_keys = mid_index
+    node.keys[mid_index:] = [0] * (19 - mid_index)
+    node.values[mid_index:] = [0] * (19 - mid_index)
+    node.children[mid_index + 1:] = [0] * (20 - (mid_index + 1))
+
+    fm.write_node(node.block_id, node)
+    fm.write_node(right_node.block_id, right_node)
+
+    if node.parent_id == 0:
+        new_root = Node(
+            block_id=header.next_block_id,
+            parent_id=0,
+            num_keys=1,
+            keys=[promoted_key] + [0] * 18,
+            values=[promoted_value] + [0] * 18,
+            children=[node.block_id, right_node.block_id] + [0] * 18
+        )
+        header.root_id = new_root.block_id
+        header.next_block_id += 1
+        fm.write_node(new_root.block_id, new_root)
+        fm.write_header(header)
+        print(f"Root split: new root created in block {new_root.block_id}")
+    else:
+        parent = fm.read_node(node.parent_id)
+        if parent.num_keys < 19:
+            insert_into_node(parent, promoted_key, promoted_value)
+            insert_pos = 0
+            while insert_pos < parent.num_keys and parent.keys[insert_pos] != promoted_key:
+                insert_pos += 1
+            parent.children = (
+                parent.children[:insert_pos + 1]
+                + [right_node.block_id]
+                + parent.children[insert_pos + 1:19]
+            )
+            fm.write_node(parent.block_id, parent)
+        else:
+            split_node(fm, parent, header)
+            updated_parent = fm.read_node(parent.block_id)
+            insert_into_node(updated_parent, promoted_key, promoted_value)
+            insert_pos = 0
+            while insert_pos < updated_parent.num_keys and updated_parent.keys[insert_pos] != promoted_key:
+                insert_pos += 1
+            updated_parent.children = (
+                updated_parent.children[:insert_pos + 1]
+                + [right_node.block_id]
+                + updated_parent.children[insert_pos + 1:19]
+            )
+            fm.write_node(updated_parent.block_id, updated_parent)
+
+
 def insert_command(filename, key, value):
     fm = FileManager(filename)
     header = fm.read_header()
@@ -55,7 +113,7 @@ def insert_command(filename, key, value):
     value = int(value)
 
     if header.root_id == 0:
-        # Tree is empty → create new root node
+        # Tree is empty → create new root
         new_node = Node(
             block_id=header.next_block_id,
             parent_id=0,
@@ -65,72 +123,59 @@ def insert_command(filename, key, value):
             children=[0] * 20
         )
         fm.write_node(header.next_block_id, new_node)
-
-        header.root_id = header.next_block_id
+        header.root_id = new_node.block_id
         header.next_block_id += 1
         fm.write_header(header)
-
         print(f"Inserted key={key} value={value} as root node in block {new_node.block_id}")
     else:
         leaf_block_id = find_leaf_block(fm, header.root_id, key)
         leaf_node = fm.read_node(leaf_block_id)
 
-        if leaf_node.num_keys >= 19:
-            print("Insert failed: leaf node is full (splitting not implemented yet).")
-            return
-
-        insert_into_node(leaf_node, key, value)
-        fm.write_node(leaf_node.block_id, leaf_node)
-
-        print(f"Inserted key={key} value={value} into leaf node block {leaf_node.block_id}")
+        if leaf_node.num_keys < 19:
+            insert_into_node(leaf_node, key, value)
+            fm.write_node(leaf_node.block_id, leaf_node)
+            print(f"Inserted key={key} value={value} into leaf node block {leaf_node.block_id}")
+        else:
+            print(f"Leaf node {leaf_node.block_id} full → splitting...")
+            split_node(fm, leaf_node, header)
+            # After split, re-run insert to retry traversal (since root/parent may have changed)
+            insert_command(filename, key, value)
 
 
 def search_command(filename, key):
     fm = FileManager(filename)
     header = fm.read_header()
-
     key = int(key)
 
     if header.root_id == 0:
-        print(f"Search failed: tree is empty.")
+        print("Search failed: tree is empty.")
         return
 
     current_block_id = header.root_id
-
     while True:
         node = fm.read_node(current_block_id)
-
         for i in range(node.num_keys):
             if node.keys[i] == key:
                 print(f"Found key={key} value={node.values[i]} in block {node.block_id}")
                 return
-
         if node.children[0] == 0:
-            break  # no children → leaf
-
+            break
         i = 0
         while i < node.num_keys and key >= node.keys[i]:
             i += 1
         next_block_id = node.children[i]
-
         if next_block_id == 0:
             break
         current_block_id = next_block_id
-
-    print(f"Search failed: key={key} not found in tree.")
+    print(f"Search failed: key={key} not found.")
 
 
 def print_subtree(fm, block_id):
-    """
-    Recursive in-order traversal: print all key/value pairs in subtree rooted at block_id.
-    """
     node = fm.read_node(block_id)
-
     for i in range(node.num_keys):
         if node.children[i] != 0:
             print_subtree(fm, node.children[i])
         print(f"{node.keys[i]}={node.values[i]}")
-
     if node.children[node.num_keys] != 0:
         print_subtree(fm, node.children[node.num_keys])
 
@@ -138,45 +183,57 @@ def print_subtree(fm, block_id):
 def print_command(filename):
     fm = FileManager(filename)
     header = fm.read_header()
-
     if header.root_id == 0:
         print("Tree is empty.")
         return
-
     print_subtree(fm, header.root_id)
 
 
 def extract_subtree(fm, block_id, file_handle):
-    """
-    Recursive in-order traversal: write key,value pairs to open file handle.
-    """
     node = fm.read_node(block_id)
-
     for i in range(node.num_keys):
         if node.children[i] != 0:
             extract_subtree(fm, node.children[i], file_handle)
-        file_handle.write(f"{node.keys[i]},{node.values[i]}\n")
-
+        file_handle.write(f"{node.keys[i]}, {node.values[i]}\n")
     if node.children[node.num_keys] != 0:
         extract_subtree(fm, node.children[node.num_keys], file_handle)
 
 
 def extract_command(filename, output_csv):
     if os.path.exists(output_csv):
-        print(f"Error: Output file '{output_csv}' already exists. Aborting extract.")
+        print(f"Error: Output file '{output_csv}' already exists.")
         sys.exit(1)
-
     fm = FileManager(filename)
     header = fm.read_header()
-
     if header.root_id == 0:
         print("Tree is empty. No data to extract.")
         return
-
     with open(output_csv, 'w') as f:
         extract_subtree(fm, header.root_id, f)
-
     print(f"Extracted all key/value pairs to '{output_csv}' successfully.")
+
+
+def load_command(filename, input_csv):
+    if not os.path.exists(input_csv):
+        print(f"Error: Input file '{input_csv}' does not exist.")
+        sys.exit(1)
+    with open(input_csv, 'r') as f:
+        line_num = 0
+        for line in f:
+            line_num += 1
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                key_str, value_str = line.split(',', 1)
+                key = int(key_str.strip())
+                value = int(value_str.strip())
+                insert_command(filename, key, value)
+            except Exception as e:
+                print(f"Error parsing line {line_num}: {line}")
+                print(f"Reason: {e}")
+                continue
+    print(f"Loaded all key/value pairs from '{input_csv}' into '{filename}' successfully.")
 
 
 def main():
@@ -213,7 +270,10 @@ def main():
             sys.exit(1)
         extract_command(filename, sys.argv[3])
     elif command == "load":
-        print("Load command not yet implemented.")
+        if len(sys.argv) != 4:
+            print("Usage: project3 load <filename> <csvfile>")
+            sys.exit(1)
+        load_command(filename, sys.argv[3])
     else:
         print(f"Unknown command: {command}")
 

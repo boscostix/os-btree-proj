@@ -26,3 +26,8 @@
 - Inserting into a non-empty tree was a little tricky, but I figured it out
 - also implemented the print function which shows the nodes in correct order
 - Also figured out loading it to csv but want to ensure bugs are fixed.
+
+# May 5 @ 10am
+- Finished implementing all functions required in main
+- Finished writing up the Readme file
+- Need to double-check and test everything, but seems to be working fine right now
